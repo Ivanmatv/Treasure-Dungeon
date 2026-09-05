@@ -1,15 +1,9 @@
+import os
+import sys
+
 from colorama import Fore, init
 
 init(autoreset=True)
-
-
-def print_result(function):
-    def wrapper(*args, **kwargs):
-        result = function(*args, **kwargs)
-        print(f'{function.__name__} вернула: {result}')
-        return result
-
-    return wrapper
 
 
 def symbols():
@@ -20,7 +14,7 @@ def symbols():
     EXIT_SYMBOL = ("E", Fore.MAGENTA)
     PLAYER_SYMBOL = ("P", Fore.BLUE)
 
-    symbols = [
+    return [
         EMPTY_SPACE_SYMBOL,
         WALL_SYMBOL,
         TRAP_SYMBOL,
@@ -28,56 +22,6 @@ def symbols():
         EXIT_SYMBOL,
         PLAYER_SYMBOL,
     ]
-
-    return symbols
-
-
-# def generate_symbols():
-#     EMPTY_SPACE_SYMBOL = (".", Fore.WHITE)
-#     WALL_SYMBOL = ("#", Fore.WHITE)
-#     TRAP_SYMBOL = ("T", Fore.RED)
-#     GOLD_SYMBOL = ("G", Fore.YELLOW)
-#     EXIT_SYMBOL = ("E", Fore.MAGENTA)
-#     PLAYER_SYMBOL = ("P", Fore.BLUE)
-#
-#     return {
-#         ".": handle_wall_symbol(),
-#         "T": handle_trap_symbol(),
-#         "G": handle_gold_symbol(),
-#         "E": handle_exit_symbol()
-#     }
-
-
-def take_gold() -> int:
-    GOLD = 10
-    return GOLD
-
-
-def show_gold(treasures: int) -> None:
-    print(
-        f'You found treasure! Current amount of treasures: {treasures}'
-    )
-
-
-def take_damage() -> int:
-    DAMAGE = 25
-    return DAMAGE
-
-
-def show_damage(player_health: int, DAMAGE) -> None:
-    print(
-        f'You have walked into a trap.! -{DAMAGE} health.'
-        f'There is some health left: {player_health}'
-    )
-
-
-def is_health_full(player_health: int) -> bool:
-    is_health_full = True
-
-    if player_health == 0:
-        is_health_full = False
-
-    return is_health_full
 
 
 def handle_wall_symbol(symbol: str):
@@ -94,10 +38,8 @@ def handle_trap_symbol(symbol: str):
     health = 0
 
     if symbol == TRAP_SYMBOL:
-        health = take_damage()
-
-        if health == 0:
-            return health
+        health = 25
+        return health
 
     return health
 
@@ -107,7 +49,7 @@ def handle_gold_symbol(symbol: str):
     gold = 0
 
     if symbol == GOLD_SYMBOL:
-        gold = take_gold()
+        gold = 10
         return gold
 
     return gold
@@ -120,22 +62,6 @@ def handle_exit_symbol(symbol: str):
         return True
 
     return False
-
-
-symbol_functions = {
-    "G": handle_gold_symbol,
-    "T": handle_trap_symbol,
-    "E": handle_exit_symbol
-}
-
-
-def handle_symbol(symbol: str):
-    handlers = {
-        ".": handle_wall_symbol(),
-        "T": handle_trap_symbol(),
-        "G": handle_gold_symbol()
-    }
-    return handlers.get(symbol)
 
 
 def show_hud(
@@ -157,11 +83,12 @@ def show_hud(
     print(f"HEALTH: {health} | TREASURES: {gold}")
     print(text_color + f"Control commands: {formatted_control_commands_list}")
     print(decore_color + "------------------------------")
+    print()
 
 
 def find_current_player_index(
-        map: list,
-        player_symbol: str
+    map: list,
+    player_symbol: str
 ) -> tuple[int, int] | tuple[None, None]:
     if map is None:
         return None, None
@@ -187,10 +114,13 @@ def create_map():
 
 
 def paint_map(map: list):
+    symbols_list = symbols()
+    symbol_index = 0
+
     for row in map:
         for cell in row:
-            for items in symbols():
-                new_symbol = items[0]
+            for items in symbols_list:
+                new_symbol = items[symbol_index]
                 if cell == new_symbol:
                     cell_index = row.index(cell)
                     row[cell_index] = items
@@ -216,12 +146,20 @@ def print_map(map: list):
         print()
 
 
-def get_next_symbol(map: list, row_index: int, cell_index: int) -> str:
+def get_next_symbol(
+    map: list,
+    row_index: int,
+    cell_index: int
+) -> str:
     next_symbol = map[row_index][cell_index]
     return next_symbol
 
 
-def is_out_of_range(map: list[list], row_index: int, cell_index: int) -> bool:
+def is_out_of_range(
+    map: list[list],
+    row_index: int,
+    cell_index: int
+) -> bool:
     row_count = len(map)
 
     cells_row_index = 0
@@ -233,20 +171,44 @@ def is_out_of_range(map: list[list], row_index: int, cell_index: int) -> bool:
     return is_out_row or is_out_cells_row
 
 
+def move_player(
+        entered_command: str,
+        commands: dict[str, str],
+        current_row_index: int,
+        current_cell_index: int
+) -> tuple[int, int] | None:
+    STEP = 1
+
+    next_row_index = current_row_index
+    next_cell_index = current_cell_index
+
+    if entered_command not in commands:
+        return None
+
+    direction = commands[entered_command]
+
+    if direction == "Up":
+        next_row_index = current_row_index - STEP
+    elif direction == "Down":
+        next_row_index = current_row_index + STEP
+    elif direction == "Left":
+        next_cell_index = current_cell_index - STEP
+    elif direction == "Right":
+        next_cell_index = current_cell_index + STEP
+
+    return next_row_index, next_cell_index
+
+
 def play():
     map = create_map()
 
     is_win = False
     is_live = True
 
-    moves = 0
+    moves = -1
     gold = 0
     player_health = 100
 
-    UP_DIRECTION_COMMAND = "W"
-    DOWN_DIRECTION_COMMAND = "S"
-    LEFT_DIRECTION_COMMAND = "A"
-    RIGHT_DIRECTION_COMMAND = "D"
     QUIT_TO_MENU_COMMAND = "Q"
 
     PLAYER_SYMBOL = "P"
@@ -260,11 +222,9 @@ def play():
         "Q": "Quit_to_menu",
     }
 
-    print(commands)
-
-    STEP = 1
     SYMBOL_INDEX = 0
     command = ''
+
     show_rules()
 
     while not is_win and is_live and command != QUIT_TO_MENU_COMMAND:
@@ -272,35 +232,30 @@ def play():
         print_map(colored_map)
         show_hud(player_health, gold, commands)
 
-        print()
+        entered_command = input('Enter your command: ').upper().strip()
 
-        command = input('Enter your command: ').upper().strip()
+        if entered_command in commands:
 
-        if command in commands:
             current_row_index, current_cell_index = find_current_player_index(map, PLAYER_SYMBOL)
 
-            next_row_index = current_row_index
-            next_cell_index = current_cell_index
-
-            if command == UP_DIRECTION_COMMAND:
-                next_row_index = current_row_index - STEP
-            elif command == DOWN_DIRECTION_COMMAND:
-                next_row_index = current_row_index + STEP
-            elif command == LEFT_DIRECTION_COMMAND:
-                next_cell_index = current_cell_index - STEP
-            elif command == RIGHT_DIRECTION_COMMAND:
-                next_cell_index = current_cell_index + STEP
+            next_row_index, next_cell_index = move_player(
+                entered_command,
+                commands,
+                current_row_index,
+                current_cell_index
+            )
 
             is_out_of_map_range = is_out_of_range(map, next_row_index, next_cell_index)
 
             if not is_out_of_map_range:
                 next_symbol = get_next_symbol(map, next_row_index, next_cell_index)
                 symbol = next_symbol[SYMBOL_INDEX]
+
                 is_wall_ahead = handle_wall_symbol(symbol)
                 is_win = handle_exit_symbol(symbol)
                 health = handle_trap_symbol(symbol)
-                player_health -= health
 
+                player_health -= health
                 if player_health <= 0:
                     is_live = False
 
@@ -318,7 +273,7 @@ def play():
                         "\n"
                     )
             else:
-                print("You have gone beyond the map.")
+                print("You can't move beyond the map.")
         else:
             print("Wrong control command")
 
@@ -352,18 +307,24 @@ def show_rules():
 def show_results(results: tuple):
     moves, treasure, health = results
 
-    print(
-        f'Health: {health} \n'
-        f'Treasure: {treasure} \n'
-        f'Moves: {moves} \n'
-    )
+    if health == 0:
+        print(
+            "\n"
+            "Wasted"
+            "\n"
+        )
+    else:
+        print(
+            "You've went out of the dungeon \n"
+            f"Health: {health} \n"
+            f"Treasure: {treasure} \n"
+            f"Moves: {moves} \n"
+        )
 
 
-def play1():
-    is_win = False
-    map = create_map()
-    result = move_player(map)
-    show_results(result)
+def game_processing():
+    results = play()
+    show_results(results)
 
 
 def show_end_window():
@@ -383,7 +344,7 @@ def main():
     }
 
     COMMAND_FUNCTIONS = {
-        1: play,
+        1: game_processing,
         2: show_rules,
         QUIT_COMMAND_NUMBER: show_end_window,
     }
@@ -405,6 +366,6 @@ def main():
             else:
                 show_error_message()
         else:
-            print('Принимается только номер')
+            print('Only the number is accepted')
 
 main()
